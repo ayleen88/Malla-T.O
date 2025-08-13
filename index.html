@@ -1,1 +1,89 @@
 
+document.addEventListener('DOMContentLoaded', () => {
+    // Selecciona todos los elementos con la clase 'ramo'
+    const ramos = document.querySelectorAll('.ramo');
+    // Clave para guardar el estado en el localStorage
+    const localStorageKey = 'malla-aprobados';
+
+    // Función para guardar el estado de los ramos aprobados en el navegador
+    const guardarEstado = (aprobados) => {
+        localStorage.setItem(localStorageKey, JSON.stringify(aprobados));
+    };
+
+    // Función para cargar el estado de los ramos aprobados desde el navegador
+    const cargarEstado = () => {
+        const aprobados = JSON.parse(localStorage.getItem(localStorageKey)) || [];
+        aprobados.forEach(ramoId => {
+            const ramo = document.getElementById(ramoId);
+            if (ramo) {
+                ramo.classList.add('aprobado');
+            }
+        });
+        return aprobados;
+    };
+
+    // Función para actualizar el estado visual de todos los ramos
+    const actualizarMalla = () => {
+        const aprobados = cargarEstado();
+        ramos.forEach(ramo => {
+            // Verifica si un ramo está aprobado
+            if (aprobados.includes(ramo.id)) {
+                ramo.classList.add('aprobado');
+                ramo.classList.remove('bloqueado');
+            } else {
+                // Si no está aprobado, verifica si está bloqueado
+                const prerequisitosString = ramo.dataset.prerequisitos || '[]';
+                const prerequisitos = JSON.parse(prerequisitosString);
+                
+                // Un ramo está bloqueado si no todos sus prerequisitos están en la lista de aprobados
+                const bloqueado = prerequisitos.some(prereq => !aprobados.includes(prereq));
+
+                if (bloqueado) {
+                    ramo.classList.add('bloqueado');
+                    ramo.classList.remove('aprobado');
+                } else {
+                    ramo.classList.remove('bloqueado');
+                }
+            }
+        });
+    };
+
+    // Maneja el evento de clic en un ramo
+    ramos.forEach(ramo => {
+        ramo.addEventListener('click', () => {
+            // No se puede interactuar con ramos aprobados o bloqueados
+            if (ramo.classList.contains('aprobado')) {
+                return;
+            }
+
+            // Obtiene los prerequisitos del ramo
+            const prerequisitosString = ramo.dataset.prerequisitos || '[]';
+            const prerequisitos = JSON.parse(prerequisitosString);
+            
+            // Verifica si todos los prerequisitos están aprobados
+            const aprobados = JSON.parse(localStorage.getItem(localStorageKey)) || [];
+            const prerequisitosCumplidos = prerequisitos.every(prereq => aprobados.includes(prereq));
+
+            if (prerequisitosCumplidos) {
+                // Si se cumplen, se marca como aprobado y se guarda el estado
+                ramo.classList.add('aprobado');
+                aprobados.push(ramo.id);
+                guardarEstado(aprobados);
+                actualizarMalla(); // Actualiza toda la malla para desbloquear otros ramos
+            } else {
+                // Si no se cumplen, muestra un mensaje de alerta con los prerequisitos faltantes
+                const ramosFaltantes = prerequisitos.filter(prereq => !aprobados.includes(prereq));
+                const nombresFaltantes = ramosFaltantes.map(id => {
+                    const el = document.getElementById(id);
+                    return el ? el.textContent : id;
+                }).join(', ');
+                alert(`Para aprobar este ramo, necesitas aprobar primero los siguientes: ${nombresFaltantes}.`);
+            }
+        });
+    });
+
+    // Carga el estado inicial y actualiza la malla al cargar la página
+    actualizarMalla();
+});
+
+	
